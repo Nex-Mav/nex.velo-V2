@@ -1890,7 +1890,7 @@
      GET {api}/stream?source=soundcloud|ytmusic&id=...  ->  the audio itself (with CORS headers and Range support)
    Set it in the page with:  Music.config.api = "https://your-worker.example/music"   */
 (() => {
-  const APP = "NexVelo", cfg = { api: "" }; let host = null;
+  const APP = "NexVelo", cfg = { api: "/api/music" }; let host = null;
   const getHost = async () => host || (host = (await (await fetch("https://api.audius.co")).json()).data[0]);
   async function aud(p) { const h = await getHost(), r = await fetch(h + "/v1" + p + (p.includes("?") ? "&" : "?") + "app_name=" + APP); if (!r.ok) { host = null; throw new Error("audius"); } return (await r.json()).data; }
   const fromA = x => ({ id: "au" + x.id, src: "audius", sid: x.id, t: x.title, a: (x.user && x.user.name) || "Unknown", d: x.duration || 0, img: x.artwork && (x.artwork["480x480"] || x.artwork["150x150"]) });
