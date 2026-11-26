@@ -1,0 +1,13 @@
+{
+  "name": "nex-velo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Nex.Velo: notch UI, Scramjet proxy, music and apps in one repo",
+  "scripts": {
+    "build": "node scripts/copy-assets.js"
+  },
+  "dependencies": {
+    "@mercuryworkshop/scramjet-controller": "latest",
+    "@mercuryworkshop/libcurl-transport": "latest"
+  }
+}
