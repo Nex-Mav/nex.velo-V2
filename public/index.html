@@ -1890,19 +1890,35 @@
      GET {api}/stream?source=soundcloud|ytmusic&id=...  ->  the audio itself (with CORS headers and Range support)
    Set it in the page with:  Music.config.api = "https://your-worker.example/music"   */
 (() => {
-  const APP = "NexVelo", cfg = { api: "/api/music" }; let host = null;
+  const APP = "NexVelo", cfg = { api: "" }; let host = null;
   const getHost = async () => host || (host = (await (await fetch("https://api.audius.co")).json()).data[0]);
   async function aud(p) { const h = await getHost(), r = await fetch(h + "/v1" + p + (p.includes("?") ? "&" : "?") + "app_name=" + APP); if (!r.ok) { host = null; throw new Error("audius"); } return (await r.json()).data; }
   const fromA = x => ({ id: "au" + x.id, src: "audius", sid: x.id, t: x.title, a: (x.user && x.user.name) || "Unknown", d: x.duration || 0, img: x.artwork && (x.artwork["480x480"] || x.artwork["150x150"]) });
   const remote = (key, tag) => ({
     search: async q => { const r = await fetch(cfg.api + "/search?source=" + key + "&q=" + encodeURIComponent(q)); if (!r.ok) throw new Error(key); return (await r.json()).map(x => ({ id: tag + x.id, src: key, sid: x.id, t: x.title, a: x.artist || "Unknown", d: x.duration || 0, img: x.image })); },
     resolve: async t => cfg.api + "/stream?source=" + key + "&id=" + encodeURIComponent(t.sid) });
+  const key = () => store.get("ytkey", "");
+  const dec = x => { const t = document.createElement("textarea"); t.innerHTML = x; return t.value; };
+  const ytId = u => { const m = /(?:youtu\.be\/|[?&]v=|shorts\/|embed\/)([\w-]{11})/.exec(u); return m && m[1]; };
+  async function oem(url, base) { try { const j = await (await fetch(base + encodeURIComponent(url))).json(); return { t: j.title || url, a: j.author_name || "", img: j.thumbnail_url }; } catch (e) { return { t: url, a: "" }; } }
+  async function link(q) {
+    q = q.trim(); const v = /youtu/i.test(q) && ytId(q);
+    if (v) { const m = await oem(q, "https://www.youtube.com/oembed?format=json&url="); return [{ id: "yt" + v, src: "youtube", yt: v, t: m.t, a: m.a || "YouTube", d: 0, img: m.img || "https://i.ytimg.com/vi/" + v + "/hqdefault.jpg" }]; }
+    if (/^https?:\/\/(www\.|m\.)?soundcloud\.com\//i.test(q)) { const m = await oem(q, "https://soundcloud.com/oembed?format=json&url="); return [{ id: "sc" + q, src: "soundcloud", sc: q, t: m.t, a: m.a || "SoundCloud", d: 0, img: m.img }]; }
+    return null;
+  }
+  async function ytSearch(q) {
+    const r = await fetch("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoCategoryId=10&maxResults=15&q=" + encodeURIComponent(q) + "&key=" + encodeURIComponent(key()));
+    if (!r.ok) throw new Error("youtube"); const j = await r.json();
+    return (j.items || []).map(x => ({ id: "yt" + x.id.videoId, src: "youtube", yt: x.id.videoId, t: dec(x.snippet.title), a: dec(x.snippet.channelTitle), d: 0, img: x.snippet.thumbnails && (x.snippet.thumbnails.high || x.snippet.thumbnails.default).url }));
+  }
   const S = {
     audius: { search: async q => (await aud("/tracks/search?limit=20&query=" + encodeURIComponent(q))).map(fromA), trending: async () => (await aud("/tracks/trending?limit=20")).map(fromA), resolve: async t => (await getHost()) + "/v1/tracks/" + t.sid + "/stream?app_name=" + APP },
-    jamendo: remote("jamendo", "jm"), soundcloud: remote("soundcloud", "sc"), ytmusic: remote("ytmusic", "ytm") };
-  const Music = window.Music = { config: cfg, sources: S, enabled: { audius: true, jamendo: true, soundcloud: false, ytmusic: false },
+    youtube: { search: ytSearch }, jamendo: remote("jamendo", "jm"), soundcloud: remote("soundcloud", "sc"), ytmusic: remote("ytmusic", "ytm") };
+  const Music = window.Music = { config: cfg, sources: S, enabled: { audius: true, youtube: true, jamendo: true, soundcloud: false, ytmusic: false },
     async search(q) {
-      const act = Object.keys(S).filter(k => Music.enabled[k] && (k === "audius" || cfg.api));
+      const lk = await link(q); if (lk) return lk;
+      const act = Object.keys(S).filter(k => Music.enabled[k] && (k === "audius" ? true : k === "youtube" ? !!key() : cfg.api));
       const lists = (await Promise.allSettled(act.map(k => S[k].search(q)))).filter(r => r.status === "fulfilled").map(r => r.value);
       if (!lists.length) throw new Error("no source"); const out = [], n = Math.max(...lists.map(l => l.length));
       for (let i = 0; i < n; i++) lists.forEach(l => { if (l[i]) out.push(l[i]); }); return out;
@@ -2016,6 +2032,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
 .mn{position:fixed;z-index:99999;min-width:200px;max-width:260px;background:#282828;color:#fff;border-radius:8px;padding:4px;box-shadow:0 10px 30px rgba(0,0,0,.6);font:13px Figtree,var(--m-font),system-ui,sans-serif}
 .mn button{display:block;width:100%;text-align:left;padding:9px 12px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}.mn button:hover{background:#3a3a3a}
 .mn hr{border:0;border-top:1px solid #3a3a3a;margin:4px 0}.mn div{color:#b3b3b3;font-size:12px;padding:6px 12px 2px}
+.emb{position:absolute;right:16px;bottom:96px;width:260px;height:260px;z-index:4;border-radius:12px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.6);background:#000;display:none}
 .ts{position:absolute;left:50%;bottom:96px;transform:translateX(-50%);z-index:5;background:#fff;color:#000;padding:10px 16px;border-radius:8px;font-weight:600;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}`;
   const scope = css => css.replace(/([^{}]+)\{([^{}]*)\}/g, (m, s, b) => s.split(",").map(x => ".mu " + x.trim()).join(",") + "{" + b + "}");
   const st = el("style");
@@ -2053,7 +2070,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
   function build() {
     const root = el("div", "mu");
     root.innerHTML = '<div class="app"><header class="top"><div class="tl"><div class="logo" data-i="note" data-f="1"></div><div class="nav"><button class="bk" data-i="back" aria-label="Back"></button><button class="fw" data-i="fwd" aria-label="Forward"></button></div></div>' +
-      '<div class="mid"><button class="round hm" data-i="home" aria-label="Home"></button><label class="search"><span data-i="search"></span><input class="qs" type="text" placeholder="Songs, artists or podcasts" autocomplete="off" spellcheck="false"></label></div>' +
+      '<div class="mid"><button class="round hm" data-i="home" aria-label="Home"></button><label class="search"><span data-i="search"></span><input class="qs" type="text" placeholder="Search, or paste a YouTube or SoundCloud link" autocomplete="off" spellcheck="false"></label></div>' +
       '<div class="tr"><span class="bell" data-i="bell"></span><button class="round me" data-i="user" aria-label="Profile"></button></div></header>' +
       '<aside class="pn lib"><div class="lh"><b>Your Library</b><button class="ib plus" data-i="plus" aria-label="Create"></button></div><div class="cp"></div><div class="lst"></div></aside>' +
       '<main class="pn main"></main><aside class="pn np"></aside>' +
@@ -2061,7 +2078,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
       '<div class="ctl"><div class="btns"><button class="shuf" data-i="shuf" aria-label="Shuffle"></button><button class="prev" data-i="prev" data-f="1" aria-label="Previous"></button><button class="pp" aria-label="Play"></button><button class="next" data-i="next" data-f="1" aria-label="Next"></button><button class="rep" data-i="rep" aria-label="Repeat"></button></div>' +
       '<div class="pr"><span class="el">0:00</span><input type="range" class="sk" min="0" max="1000" value="0" aria-label="Seek"><span class="du">0:00</span></div></div>' +
       '<div class="rt"><button class="qb" data-i="q" aria-label="Queue"></button><button class="mv" aria-label="Mute"></button><input class="vol" type="range" min="0" max="100" aria-label="Volume"></div></footer></div>' +
-      '<input class="ff" type="file" accept="audio/*" multiple hidden><div class="ts"></div>';
+      '<input class="ff" type="file" accept="audio/*" multiple hidden><div class="ts"></div><div class="emb"><div class="eyt"></div><div class="esc"></div></div>';
     root.querySelectorAll("[data-i]").forEach(e => { e.innerHTML = ic(e.dataset.i, e.dataset.f); });
     const q = s => root.querySelector(s), M = q(".main"), NP = q(".np"), L = q(".lst");
 
@@ -2088,13 +2105,62 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
     }
 
     /* Player */
-    const au = new Audio(); au.volume = D.vol / 100;
+    const nat = new Audio(); let au = nat; au.volume = D.vol / 100;
     let Q = [], qi = -1, on = false, pos = 0, muted = false;
+    /* YouTube and SoundCloud play through their own official embedded players (shown bottom right), wrapped to behave like an audio element */
+    const emb = q(".emb"), eyt = q(".eyt"), esc = q(".esc");
+    const showE = k => { emb.style.display = k ? "block" : "none"; eyt.style.display = k === "yt" ? "block" : "none"; esc.style.display = k === "sc" ? "block" : "none"; };
+    eyt.style.cssText = esc.style.cssText = "width:100%;height:100%";
+    const ytA = (() => {
+      let p = null, loading = null, vol = 70, mu = false, want = "", making = false;
+      const o = { onended: null, onloadedmetadata: null, _id: "",
+        get src() { return o._id; }, set src(v) { o._id = v; open(v); },
+        removeAttribute() { o._id = ""; if (p && p.pauseVideo) p.pauseVideo(); showE(""); },
+        play() { if (p && p.playVideo) p.playVideo(); return Promise.resolve(); }, pause() { if (p && p.pauseVideo) p.pauseVideo(); },
+        get currentTime() { return p && p.getCurrentTime ? p.getCurrentTime() : 0; }, set currentTime(x) { if (p && p.seekTo) p.seekTo(x, true); },
+        get duration() { return p && p.getDuration ? p.getDuration() : 0; },
+        get volume() { return vol / 100; }, set volume(x) { vol = x * 100; if (p && p.setVolume) p.setVolume(vol); },
+        get muted() { return mu; }, set muted(x) { mu = x; if (p && p.mute) { if (x) p.mute(); else p.unMute(); } } };
+      const api = () => window.YT && YT.Player ? Promise.resolve() : loading || (loading = new Promise(ok => { const s = el("script"); s.src = "https://www.youtube.com/iframe_api"; window.onYouTubeIframeAPIReady = ok; document.head.append(s); }));
+      async function open(id) {
+        want = id; showE("yt"); await api();
+        if (p) { p.loadVideoById(want); return; } if (making) return; making = true;
+        const d = el("div"); eyt.append(d);
+        p = new YT.Player(d, { width: "100%", height: "100%", videoId: want, playerVars: { playsinline: 1 }, events: {
+          onReady: () => { p.setVolume(vol); if (mu) p.mute(); p.playVideo(); },
+          onStateChange: e => { if (e.data === 0 && o.onended) o.onended(); if (e.data === 1 && o.onloadedmetadata) o.onloadedmetadata(); },
+          onError: () => { toast("This video can't be played here"); on = false; paint(); } } });
+      }
+      return o;
+    })();
+    const scA = (() => {
+      let w = null, loading = null, pp = 0, dur = 0, vol = 70, mu = false, want = "", making = false;
+      const o = { onended: null, onloadedmetadata: null, _id: "",
+        get src() { return o._id; }, set src(v) { o._id = v; open(v); },
+        removeAttribute() { o._id = ""; if (w) w.pause(); showE(""); },
+        play() { if (w) w.play(); return Promise.resolve(); }, pause() { if (w) w.pause(); },
+        get currentTime() { return pp; }, set currentTime(x) { pp = x; if (w) w.seekTo(x * 1000); },
+        get duration() { return dur; },
+        get volume() { return vol / 100; }, set volume(x) { vol = x * 100; if (w && !mu) w.setVolume(vol); },
+        get muted() { return mu; }, set muted(x) { mu = x; if (w) w.setVolume(x ? 0 : vol); } };
+      const api = () => window.SC && SC.Widget ? Promise.resolve() : loading || (loading = new Promise(ok => { const s = el("script"); s.src = "https://w.soundcloud.com/player/api.js"; s.onload = ok; document.head.append(s); }));
+      const meta = () => { pp = 0; w.setVolume(mu ? 0 : vol); w.getDuration(d => { dur = d / 1000; if (o.onloadedmetadata) o.onloadedmetadata(); }); };
+      async function open(url) {
+        want = url; showE("sc"); await api(); pp = 0; dur = 0;
+        if (w) { w.load(want, { auto_play: true, callback: meta }); return; } if (making) return; making = true;
+        const f = el("iframe"); f.allow = "autoplay"; f.style.cssText = "width:100%;height:100%;border:0"; f.src = "https://w.soundcloud.com/player/?auto_play=true&url=" + encodeURIComponent(want); esc.append(f);
+        w = SC.Widget(f); w.bind(SC.Widget.Events.READY, meta); w.bind(SC.Widget.Events.FINISH, () => { if (o.onended) o.onended(); }); w.bind(SC.Widget.Events.PLAY_PROGRESS, e => { pp = e.currentPosition / 1000; });
+      }
+      return o;
+    })();
     const cur = () => Q[qi], dur = () => (au.src && isFinite(au.duration) && au.duration) || (cur() ? cur().d : 0);
     function playAt(i) {
       const t = Q[i]; if (!t) return; qi = i; pos = 0; on = true;
+      const eng = t.yt ? ytA : t.sc ? scA : nat;
+      if (eng !== au) { au.pause(); au.removeAttribute("src"); au = eng; au.volume = D.vol / 100; au.muted = muted; }
       D.recent = [t].concat(D.recent.filter(x => !same(x, t))).slice(0, 20); save();
-      if (t.url) { au.src = t.url; au.play().catch(() => { toast("This song could not be played"); }); }
+      if (t.yt || t.sc) { au.src = t.yt || t.sc; au.play(); }
+      else if (t.url) { au.src = t.url; au.play().catch(() => { toast("This song could not be played"); }); }
       else if (t.src && window.Music && Music.resolve) { au.pause(); au.removeAttribute("src"); const me = qi; Music.resolve(t).then(u => { if (qi !== me) return; au.src = u; au.play().catch(() => { toast("This song could not be played"); }); }).catch(() => { if (qi === me) { on = false; toast("Could not load this song"); paint(); } }); }
       else { au.pause(); au.removeAttribute("src"); if (t.id[0] === "f") toast("Add this file again to hear it"); }
       paint();
@@ -2107,7 +2173,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
       if (D.rep === 1) return playAt((n + Q.length) % Q.length); on = false; au.pause(); pos = 0; paint();
     }
     const ended = () => { if (D.rep === 2) playAt(qi); else step(1); };
-    au.onended = ended; au.onloadedmetadata = () => { if (cur()) { cur().d = au.duration; paint(); } };
+    const gotMeta = () => { if (cur()) { cur().d = au.duration; paint(); } }; [nat, ytA, scA].forEach(e => { e.onended = ended; e.onloadedmetadata = gotMeta; });
     setInterval(() => {
       if (!on || !cur() || win.hidden) return; const silent = !au.src; pos = silent ? pos + .5 : au.currentTime;
       if (silent && pos >= cur().d) return ended(); q(".el").textContent = fmt(pos); q(".du").textContent = fmt(dur()); q(".sk").value = dur() ? pos / dur() * 1000 : 0; rng(q(".sk"));
@@ -2154,7 +2220,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
     const go = (v, push = true) => { if (push) { H = H.slice(0, hi + 1); H.push(v); hi = H.length - 1; } render(); };
     q(".bk").onclick = () => { if (hi > 0) { hi--; render(); } }; q(".fw").onclick = () => { if (hi < H.length - 1) { hi++; render(); } };
     q(".hm").onclick = () => { q(".qs").value = ""; go({ v: "home" }); };
-    q(".plus").onclick = e => { const b = e.currentTarget.getBoundingClientRect(); menu(b.left, b.bottom + 4, [["New playlist", () => newPl()], ["Add songs from this device", () => q(".ff").click()]]); };
+    q(".plus").onclick = e => { const b = e.currentTarget.getBoundingClientRect(); menu(b.left, b.bottom + 4, [["New playlist", () => newPl()], ["Add songs from this device", () => q(".ff").click()], ["YouTube search key\u2026", () => { const k = prompt("Optional: paste a YouTube Data API key to search YouTube here. Leave empty to remove it. Pasting a YouTube or SoundCloud link into search works without a key.", store.get("ytkey", "")); if (k !== null) { store.set("ytkey", k.trim()); toast(k.trim() ? "YouTube search is on" : "YouTube search key removed"); } }]]); };
     q(".ff").onchange = e => {
       const f = [...e.target.files]; if (!f.length) return; const add = f.map((x, i) => ({ id: "f" + Date.now() + i, t: x.name.replace(/\.[^.]+$/, ""), a: "This device", d: 0, url: URL.createObjectURL(x) }));
       LOCAL = add.concat(LOCAL); toast("Added " + add.length + (add.length === 1 ? " song" : " songs") + " from this device"); e.target.value = ""; go({ v: "home" }); playList(add, 0);
