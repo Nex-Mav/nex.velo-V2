@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node scripts/copy-assets.js",
+  "outputDirectory": "public",
+  "installCommand": "npm install"
+}
