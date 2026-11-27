@@ -1676,9 +1676,9 @@
   }
 
   const GAMES = [{ n: "Snake", i: '<path d="M4 17h5a3.5 3.5 0 000-7H8a3.5 3.5 0 010-7h12M17 3l3 0M20 3l-1.5 2"/>', d: "Arrow keys or WASD", run: snake }, { n: "2048", i: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>', d: "Slide and merge tiles", run: g2048 }, { n: "Tic-Tac-Toe", i: '<path d="M9 4v16M15 4v16M4 9h16M4 15h16"/>', d: "You are X", run: ttt }];
-  const root = el("div", "gm"), TABS = [["arcade", "Arcade"], ["all", "All games"], ["gn", "GN Math"], ["obsidian", "Obsidian"], ["ugs", "UGS"], ["duckmath", "DuckMath"], ["weslack", "Weslack"]];
+  const root = el("div", "gm"), TABS = [["all", "All games"], ["gn", "GN Math"], ["obsidian", "Obsidian"], ["ugs", "UGS"], ["duckmath", "DuckMath"], ["weslack", "Weslack"]];
   const SITE = { duckmath: "https://duckmath.org/", weslack: "https://weslack.com/" }, LIBS = ["gn", "obsidian", "ugs"], lists = {};
-  let tab = store.get("gamestab", "arcade"); if (!TABS.some(t => t[0] === tab)) tab = "arcade";
+  let tab = store.get("gamestab", "all"); if (!TABS.some(t => t[0] === tab)) tab = "all";
   const gst = el("style");
   gst.textContent = `.gm{padding:12px 14px;display:flex;flex-direction:column}.gtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .gtab{border:0;border-radius:18px;padding:7px 14px;background:var(--m-fill);color:var(--m-fg);font:inherit;font-size:13px;cursor:default;transition:background .1s}.gtab:hover{background:var(--m-fillh)}.gtab.on{background:var(--accent);color:#fff}
@@ -1700,7 +1700,7 @@
   function show() {
     stop(); root.replaceChildren(); const bar = el("div", "gtabs"), body = el("div", "gbody");
     TABS.forEach(([k, n]) => { const b = el("button", "gtab" + (k === tab ? " on" : ""), n); b.onclick = () => { tab = k; store.set("gamestab", k); show(); }; bar.append(b); }); root.append(bar, body);
-    if (tab === "arcade") return arcade(body); if (SITE[tab]) return siteView(body, SITE[tab]); library(body);
+    if (SITE[tab]) return siteView(body, SITE[tab]); library(body);
   }
   const menu = show;
   function arcade(body) {
@@ -2050,6 +2050,16 @@
     cols.forEach(c => { const b = el("button", settings.accent.toLowerCase() === c ? "sel" : ""); b.style.background = c; b.setAttribute("aria-label", c); b.onclick = () => { settings.accent = c; save(); applySettings(); render(); }; box.append(b); });
     const l = el("label"), i = el("input"); i.type = "color"; i.value = /^#[0-9a-f]{6}$/i.test(settings.accent) ? settings.accent : "#0a84ff"; l.title = "Pick your own colour"; i.onchange = () => { settings.accent = i.value; save(); applySettings(); render(); }; l.append(i); box.append(l); return box;
   }
+  const FILES = ["/sw.js", "/scramjet/scramjet.js", "/scramjet/scramjet.wasm", "/controller/controller.api.js", "/controller/controller.sw.js", "/controller/controller.inject.js", "/libcurl/index.js"];
+  async function check(out) {
+    out.replaceChildren(); const add = (ok, t, d) => { const r = row(t, el("span", "m2", d || "")); r.style.borderLeft = "4px solid " + (ok ? "#30d158" : "#ff453a"); out.append(r); };
+    for (const f of FILES) { try { const r = await fetch(f, { cache: "no-store" }), page = /text\/html/.test(r.headers.get("content-type") || ""); add(r.ok && !page, f, r.ok ? (page ? "missing (the site sent a page instead)" : "found") : "not found (HTTP " + r.status + ")"); } catch (e) { add(false, f, "could not load"); } }
+    add(typeof $scramjetController !== "undefined", "Proxy controller script is loaded", typeof $scramjetController !== "undefined" ? "yes" : "no");
+    add(typeof LibcurlTransport !== "undefined", "Transport script is loaded", typeof LibcurlTransport !== "undefined" ? "yes" : "no");
+    add("serviceWorker" in navigator, "Service workers are available", location.protocol === "https:" || location.hostname === "localhost" ? "" : "needs https");
+    try { const reg = await navigator.serviceWorker.getRegistration("/"); add(!!(reg && reg.active), "Service worker is running", reg && reg.active ? reg.active.scriptURL.replace(location.origin, "") : "not registered yet (open the Browser once)"); } catch (e) { add(false, "Service worker is running", "error"); }
+    const ms = await ping(getWisp()); add(ms !== null, "Wisp server " + getWisp(), ms === null ? "no answer" : ms + " ms");
+  }
   function serversRows() {
     const out = [], ms = {}, list = el("div", "grp");
     const pick = u => { settings.wisp = u; save(); applySettings(); draw(); };
@@ -2064,6 +2074,7 @@
     out.push(R("Test all servers", bt("Test", test)));
     out.push(R("Use the fastest", bt("Test and switch", async () => { const all = await test(); let best = null; all.forEach(([n, u]) => { if (ms[u] !== null && (best === null || ms[u] < ms[best])) best = u; }); if (best) { pick(best); notify("Using the fastest server"); } else notify("No server answered"); })));
     out.push(R("Your own server", inp, bt("Save", () => { const v = inp.value.trim(); if (!/^wss?:\/\//i.test(v)) { notify("Enter a ws:// or wss:// address"); return; } settings.wispCustom = v; settings.wisp = v; save(); applySettings(); draw(); })));
+    const res = el("div", "grp"); out.push(R("Check proxy setup", bt("Run check", () => check(res)))); out.push({ label: "Proxy check", node: res, block: true });
     return out;
   }
   const dump = () => { const d = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("winnotch.")) d[k] = localStorage.getItem(k); } return d; };
