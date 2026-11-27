@@ -319,6 +319,7 @@
       <section class="panel" id="panel-home">
         <div class="hm">
           <div class="hl">
+            <div class="greet" id="greet"></div>
             <div class="time" id="time"></div>
             <div class="date" id="date"></div>
             <div class="meta" id="weather"></div>
@@ -455,7 +456,7 @@
      e.g. ENGINE.encode = u => scramjet.encodeUrl(u);  */
   const ENGINE = { encode: null };
   const getWisp = () => settings.wisp || WISP_DEFAULT;
-  const SEARCH = "https://duckduckgo.com/?q=";
+  const engineUrl = () => ({ ddg: "https://duckduckgo.com/?q=", google: "https://www.google.com/search?q=", bing: "https://www.bing.com/search?q=", brave: "https://search.brave.com/search?q=" })[settings.engine] || "https://duckduckgo.com/?q=";
   function checkWisp(cb) {
     let done = false, ws;
     const fin = ok => { if (done) return; done = true; try { ws.close(); } catch (e) {} cb(ok); };
@@ -466,7 +467,7 @@
     v = v.trim(); if (!v) return "";
     if (/^https?:\/\//i.test(v)) return v;
     if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(v) && !/\s/.test(v)) return "https://" + v;
-    return SEARCH + encodeURIComponent(v);
+    return engineUrl() + encodeURIComponent(v);
   }
   function notice(html) {
     return '<meta name="color-scheme" content="light dark"><body style="font:15px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;display:grid;place-items:center;height:100vh;margin:0;text-align:center"><div style="max-width:420px;padding:20px"><h2>Proxy engine not connected</h2><p style="opacity:.65;line-height:1.5">' + html + '</p></div></body>';
@@ -511,7 +512,8 @@
       li.append(a, b); li.onpointermove = () => { palSel = i; [...ul.children].forEach((c, j) => c.classList.toggle("sel", j === i)); }; li.onclick = () => runPal(i); ul.append(li);
     });
   }
-  function openPalette() {
+  function openPalette() { if (api) api.focus(); return; }
+  function openPaletteOld() {
     if (!pal) {
       pal = document.createElement("div"); pal.className = "pal";
       pal.innerHTML = '<div class="pbox"><input placeholder="Search or enter a website" spellcheck="false" autocomplete="off"><ul></ul></div>';
@@ -560,11 +562,11 @@
       '<div class="seg"><button class="tbtn" data-b title="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button><button class="tbtn" data-f title="Forward"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button></div>' +
       '<div class="urlw"><span class="fav" draggable="true" title="Drag this page out as a link">' + SVG_GLOBE + '</span><input type="text" placeholder="Search or enter website name" spellcheck="false" autocomplete="off"><span class="wdot" title="Wisp status"></span></div>' +
       '<button class="tbtn" data-r title="Reload"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7M20 4v5h-5"/></svg></button>' +
-      '<button class="tbtn" data-s title="Search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></button></div>' +
+      '</div>' +
       '<div class="prog"></div><div class="pbody"><div class="pempty"><div class="fav-wrap"><div class="fav-h">Favorites</div><div class="fgrid"></div></div>' +
-      '<p class="es"><span class="wdot"></span><span class="wl">Checking Wisp\u2026</span></p></div><iframe hidden></iframe><div class="drop">Drop a link to open it</div><div class="sheet"></div></div>';
+      '<p class="es"><span class="wdot"></span><span class="wl">Checking Wisp\u2026</span></p></div><iframe hidden></iframe><div class="ld" hidden><div class="dots"><i></i><i></i><i></i><i></i></div><p>Loading\u2026</p><small>Taking a while? Try another server in Settings, Servers.</small></div><div class="drop">Drop a link to open it</div><div class="sheet"></div></div>';
     document.body.appendChild(pwin);
-    const q = s => pwin.querySelector(s), input = q("input"), frame = q("iframe"), prog = q(".prog"), empty = q(".pempty"), tb = q(".ptb"), sheet = q(".sheet"), fav = q(".fav");
+    const q = s => pwin.querySelector(s), input = q("input"), frame = q("iframe"), prog = q(".prog"), ld = q(".ld"), empty = q(".pempty"), tb = q(".ptb"), sheet = q(".sheet"), fav = q(".fav");
     const grid = q(".fgrid"), asheet = document.createElement("div");
     asheet.className = "sheet asheet";
     asheet.innerHTML = '<h3>Add Shortcut</h3><div class="ap"><div class="ic"></div><div class="af"><input type="text" class="an" placeholder="Name" autocomplete="off"><input type="text" class="au" placeholder="Link (example.com)" autocomplete="off" spellcheck="false"></div></div><div class="arow"><button class="btn ghost ac">Cancel</button><button class="btn aa">Add</button></div>';
@@ -597,10 +599,10 @@
     };
     renderFavs();
     const go = v => {
-      const u = normalizeUrl(v); if (!u) return; cur = u; input.value = u; empty.hidden = true; frame.hidden = false;
+      const u = normalizeUrl(v); if (!u) return; cur = u; input.value = u; empty.hidden = true; frame.hidden = false; ld.hidden = false;
       prog.style.transition = "none"; prog.style.width = "0"; prog.classList.add("on"); void prog.offsetWidth; prog.style.transition = ""; prog.style.width = "80%";
-      frame.onload = () => { prog.style.width = "100%"; setTimeout(() => { prog.classList.remove("on"); prog.style.width = "0"; }, 350); };
-      if (ENGINE.go) { frame.removeAttribute("srcdoc"); ENGINE.go(frame, u).catch(err => { frame.srcdoc = notice("The proxy could not start: " + (err && err.message || err)); }); }
+      frame.onload = () => { ld.hidden = true; prog.style.width = "100%"; setTimeout(() => { prog.classList.remove("on"); prog.style.width = "0"; }, 350); };
+      if (ENGINE.go) { frame.removeAttribute("srcdoc"); ENGINE.go(frame, u).catch(err => { ld.hidden = true; frame.srcdoc = notice("The proxy could not start: " + (err && err.message || err)); }); }
       else if (ENGINE.encode) { frame.removeAttribute("srcdoc"); frame.src = ENGINE.encode(u); }
       else frame.srcdoc = notice("The browser window is ready and pointed at <code>" + getWisp() + "</code>. Register your proxy\u2019s service worker and set <code>ENGINE.encode</code> in this file to start loading pages.");
     };
@@ -630,7 +632,12 @@
       }
     };
     input.addEventListener("keydown", e => { if (e.key === "Enter") { go(input.value); input.blur(); } else if (e.key === "Escape") { input.value = cur; input.blur(); } });
-    reloadBtn.onclick = () => api.reload(); backBtn.onclick = () => api.back(); fwdBtn.onclick = () => api.fwd(); q("[data-s]").onclick = () => openPalette();
+    /* suggestions appear only while you type */
+    const sug = document.createElement("ul"); sug.className = "sug"; q(".pbody").append(sug); let sgT = 0; const hideSug = () => sug.replaceChildren();
+    input.addEventListener("input", () => { clearTimeout(sgT); const v = input.value.trim(); if (v.length < 2) return hideSug();
+      sgT = setTimeout(() => fetch("https://en.wikipedia.org/w/api.php?action=opensearch&limit=6&format=json&origin=*&search=" + encodeURIComponent(v)).then(r => r.json()).then(j => { if (input.value.trim() !== v) return; hideSug(); (j[1] || []).forEach(t => { const li = document.createElement("li"); li.textContent = t; li.onmousedown = e => { e.preventDefault(); input.value = t; hideSug(); go(t); input.blur(); }; sug.append(li); }); }).catch(() => {}), 250); });
+    input.addEventListener("blur", () => setTimeout(hideSug, 150)); input.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === "Escape") hideSug(); });
+    reloadBtn.onclick = () => api.reload(); backBtn.onclick = () => api.back(); fwdBtn.onclick = () => api.fwd();
     checkWisp(ok => { pwin && pwin.querySelectorAll(".wdot").forEach(d => d.className = "wdot " + (ok ? "ok" : "bad")); const l = pwin && pwin.querySelector(".wl"); if (l) l.textContent = ok ? "Wisp connected" : "Wisp unreachable"; });
     pwin.addEventListener("pointerdown", () => { pwin.style.zIndex = ++pz; }, true);
     q(".lights").addEventListener("click", e => { const a = e.target.dataset.a; if (a === "x") api.close(); if (a === "m") pwin.hidden = true; if (a === "z") api.max(); });
@@ -1456,7 +1463,8 @@
     const APPS = [
       ["Browser", "linear-gradient(#5ac8fa,#0a84ff)", '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.8 3 2.8 15 0 18M12 3c-2.8 3-2.8 15 0 18"/>', () => openProxy(), () => pwin],
       ["Music", "linear-gradient(#ff6b8a,#ff2d55)", '<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5" fill="currentColor"/><circle cx="16.5" cy="16" r="2.5" fill="currentColor"/>', openMusic, () => musicWin],
-      ["Games", "var(--accent)", '<rect x="2" y="7" width="20" height="11" rx="5.5"/><path d="M7 10.5v4M5 12.5h4"/><circle cx="16" cy="11.5" r="1" fill="currentColor"/><circle cx="18.5" cy="14" r="1" fill="currentColor"/>', () => window.openGames && window.openGames(), () => window.gamesWin],
+      ["Games", "var(--accent)", '<path d="M7.5 6h9a5 5 0 014.9 4l.9 4.6a3 3 0 01-5 2.7L15 14H9l-2.3 3.3a3 3 0 01-5-2.7l.9-4.6A5 5 0 017.5 6z" fill="currentColor" stroke="none"/><path d="M8 9v4M6 11h4" stroke="var(--accent)" stroke-width="1.6"/><circle cx="16" cy="10" r="1.1" fill="var(--accent)" stroke="none"/><circle cx="18.2" cy="12.2" r="1.1" fill="var(--accent)" stroke="none"/>', () => window.openGames && window.openGames(), () => window.gamesWin],
+      ["Chat", "var(--accent)", '<path d="M5 4h14a2 2 0 012 2v9a2 2 0 01-2 2h-7l-4 3.5V17H5a2 2 0 01-2-2V6a2 2 0 012-2z" fill="currentColor" stroke="none"/>', () => window.openChat && window.openChat(), () => window.chatWin],
       ["Apps", "var(--accent)", '<circle cx="6" cy="6" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="6" r="1.9" fill="currentColor" stroke="none"/><circle cx="18" cy="6" r="1.9" fill="currentColor" stroke="none"/><circle cx="6" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.9" fill="currentColor" stroke="none"/><circle cx="6" cy="18" r="1.9" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.9" fill="currentColor" stroke="none"/><circle cx="18" cy="18" r="1.9" fill="currentColor" stroke="none"/>', () => window.openApps && window.openApps(), () => document.querySelector(".lau")]
     ];
     const dock = el("div", "dock");
@@ -1668,18 +1676,58 @@
   }
 
   const GAMES = [{ n: "Snake", i: '<path d="M4 17h5a3.5 3.5 0 000-7H8a3.5 3.5 0 010-7h12M17 3l3 0M20 3l-1.5 2"/>', d: "Arrow keys or WASD", run: snake }, { n: "2048", i: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>', d: "Slide and merge tiles", run: g2048 }, { n: "Tic-Tac-Toe", i: '<path d="M9 4v16M15 4v16M4 9h16M4 15h16"/>', d: "You are X", run: ttt }];
-  const root = el("div", "gm");
+  const root = el("div", "gm"), TABS = [["arcade", "Arcade"], ["all", "All games"], ["gn", "GN Math"], ["obsidian", "Obsidian"], ["ugs", "UGS"], ["duckmath", "DuckMath"], ["weslack", "Weslack"]];
+  const SITE = { duckmath: "https://duckmath.org/", weslack: "https://weslack.com/" }, LIBS = ["gn", "obsidian", "ugs"], lists = {};
+  let tab = store.get("gamestab", "arcade"); if (!TABS.some(t => t[0] === tab)) tab = "arcade";
+  const gst = el("style");
+  gst.textContent = `.gm{padding:12px 14px;display:flex;flex-direction:column}.gtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.gtab{border:0;border-radius:18px;padding:7px 14px;background:var(--m-fill);color:var(--m-fg);font:inherit;font-size:13px;cursor:default;transition:background .1s}.gtab:hover{background:var(--m-fillh)}.gtab.on{background:var(--accent);color:#fff}
+.gbody{flex:1;min-height:0;overflow:auto;position:relative}.gq{width:100%;box-sizing:border-box;height:38px;border:0;border-radius:19px;background:var(--m-fill);color:var(--m-fg);padding:0 16px;font:inherit;outline:0;margin-bottom:12px}
+.gmsg{color:var(--m-mut);padding:10px 4px;line-height:1.5}.gg2{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}
+.gk{border:0;background:var(--m-fill);border-radius:14px;padding:8px;color:inherit;font:inherit;font-size:12px;text-align:center;cursor:default;transition:background .1s,transform .1s}.gk:hover{background:var(--m-fillh)}.gk:active{transform:scale(.96)}
+.gk i{display:grid;place-items:center;width:100%;aspect-ratio:1;border-radius:10px;background:center/cover;font-style:normal;font-size:30px;font-weight:600;color:#fff;margin-bottom:6px}.gk span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gv{position:absolute;inset:44px 0 0}`;
+  document.head.append(gst);
   const stop = () => { if (cur) { cur(); cur = null; } };
-  function menu() {
-    stop(); root.replaceChildren(el("h2", null, "Games")); const g = el("div", "gg");
-    GAMES.forEach(x => { const b = el("button", "gc"); const ii = el("i"); ii.innerHTML = '<svg viewBox="0 0 24 24">' + x.i + '</svg>'; b.append(ii, el("b", null, x.n), el("span", null, x.d)); b.onclick = () => play(x); g.append(b); }); root.append(g);
+  const hb = (t, f) => { const b = el("button", "btn ghost", t); b.onclick = f; return b; };
+  async function loadLib(k) { const r = await fetch("/api/games/list?src=" + k), d = await r.json().catch(() => ({})); if (!r.ok || !d.games || !d.games.length) throw new Error(d.error || "the server answered " + r.status); return (lists[k] = d.games); }
+  async function load(k) {
+    if (lists[k]) return lists[k]; if (k !== "all") return loadLib(k);
+    const parts = await Promise.all(LIBS.map(async x => { try { return (lists[x] || await loadLib(x)).map(g => Object.assign({ lib: x }, g)); } catch (e) { return []; } })), seen = new Set(), all = [];
+    for (const g of parts.flat()) { const n = g.name.trim().toLowerCase(); if (n && !seen.has(n)) { seen.add(n); all.push(g); } }
+    if (!all.length) throw new Error("none of the game libraries could be loaded"); all.sort((x, y) => x.name.localeCompare(y.name, undefined, { numeric: true, sensitivity: "base" })); return (lists.all = all);
   }
-  function play(x) {
-    stop(); root.replaceChildren(); const t = el("div", "gt"), back = el("button", "btn ghost", "\u2039 Games"), sc = el("span", "gs"), again = el("button", "btn ghost", "New game"), host = el("div", "gx");
-    back.onclick = menu; again.onclick = () => play(x); t.append(back, el("b", null, x.n), sc, again); root.append(t, host); cur = x.run(host, sc);
+  function show() {
+    stop(); root.replaceChildren(); const bar = el("div", "gtabs"), body = el("div", "gbody");
+    TABS.forEach(([k, n]) => { const b = el("button", "gtab" + (k === tab ? " on" : ""), n); b.onclick = () => { tab = k; store.set("gamestab", k); show(); }; bar.append(b); }); root.append(bar, body);
+    if (tab === "arcade") return arcade(body); if (SITE[tab]) return siteView(body, SITE[tab]); library(body);
+  }
+  const menu = show;
+  function arcade(body) {
+    const g = el("div", "gg"); GAMES.forEach(x => { const b = el("button", "gc"), ii = el("i"); ii.innerHTML = '<svg viewBox="0 0 24 24">' + x.i + '</svg>'; b.append(ii, el("b", null, x.n), el("span", null, x.d)); b.onclick = () => playBuilt(x, body); g.append(b); }); body.append(g);
+  }
+  function playBuilt(x, body) {
+    stop(); body.replaceChildren(); const t = el("div", "gt"), sc = el("span", "gs"), host = el("div", "gx"); t.append(hb("\u2039 Back", show), el("b", null, x.n), sc, hb("New game", () => playBuilt(x, body))); body.append(t, host); cur = x.run(host, sc);
+  }
+  function siteView(body, url) { const v = window.nvProxyView ? nvProxyView(url) : el("div", "gmsg", "The proxy isn't connected yet."); v.style.inset = "0"; body.append(v); }
+  async function library(body) {
+    const q = el("input", "gq"), msg = el("div", "gmsg", "Loading games\u2026"), grid = el("div", "gg2"); q.placeholder = "Search games"; body.append(q, msg, grid);
+    let games; try { games = await load(tab); } catch (e) { msg.textContent = "Couldn't load these games. " + (e.message || e); return; }
+    msg.textContent = ""; let shown = 0, list = games;
+    const more = () => { list.slice(shown, shown + 60).forEach(g => { const b = el("button", "gk"), i = el("i"); if (g.thumb) i.style.backgroundImage = "url('" + g.thumb.replace(/'/g, "%27") + "')"; else { let h = 7; for (const c of g.name) h = (h * 31 + c.charCodeAt(0)) % 360; i.style.background = "linear-gradient(135deg,hsl(" + h + " 55% 40%),hsl(" + ((h + 50) % 360) + " 55% 26%))"; i.textContent = (g.name.trim()[0] || "?").toUpperCase(); } b.append(i, el("span", null, g.name)); b.onclick = () => playLib(g, body); grid.append(b); }); shown = Math.min(list.length, shown + 60); };
+    const draw = () => { const f = q.value.trim().toLowerCase(); list = f ? games.filter(g => g.name.toLowerCase().includes(f)) : games; shown = 0; grid.replaceChildren(); more(); msg.textContent = list.length ? "" : "No games match that search."; };
+    q.oninput = draw; draw(); body.onscroll = () => { if (shown < list.length && body.scrollTop + body.clientHeight > body.scrollHeight - 400) more(); };
+  }
+  async function playLib(g, body) {
+    body.onscroll = null; body.replaceChildren(); const t = el("div", "gt"), view = el("div", "gv"), f = el("iframe"); t.append(hb("\u2039 Back", show), el("b", null, g.name), hb("Open in Browser", () => navigate(g.url)));
+    f.allow = "fullscreen; autoplay; gamepad"; f.setAttribute("allowfullscreen", ""); f.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0;background:#000"; view.append(f); body.append(t, view);
+    try {   // the page is fetched and written into the frame, which also works when the host serves it as plain text
+      const r = await fetch(g.url); if (!r.ok) throw new Error("HTTP " + r.status); let html = await r.text(); const base = '<base href="' + g.url.replace(/[^/]*$/, "") + '">';
+      f.srcdoc = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, m => m + base) : base + html;
+    } catch (e) { f.remove(); view.append(el("div", "gmsg", "Couldn't open this game (" + (e.message || e) + "). Try Open in Browser.")); }
   }
   window.openGames = () => {
-    if (!win) { menu(); win = mkWin("Games", 520, 560, root, true); win.classList.add("gmwin"); }
+    if (!win) { root.style.cssText = ""; show(); win = mkWin("Games", 820, 580, root, true); win.classList.add("gmwin"); }
     win.hidden = false; win.style.zIndex = ++pz;
   };
   Object.defineProperty(window, "gamesWin", { get: () => win });
@@ -1880,6 +1928,212 @@
 <script src="/controller/controller.api.js"></script>
 <script src="/libcurl/index.js"></script>
 <script src="/proxy.js"></script>
+<script>
+/* Nex.Velo v2: new Settings, first-visit tour, greeting, Chat app, loading page, extra wallpapers and accents */
+(() => {
+  const VER = "1.00.0";
+  const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+  const st = el("style");
+  st.textContent = `
+.pwin [data-s],.pwin .urlw .wdot,.pempty .es,.pbody .sheet:not(.asheet),.prog{display:none!important}
+.ld{position:absolute;inset:0;z-index:3;background:#fff;display:grid;align-content:center;justify-items:center;gap:16px;font-family:var(--m-font)}
+.ld[hidden]{display:none}.ld .dots{display:flex;gap:10px}
+.ld i{width:14px;height:14px;border-radius:50%;animation:ldb 1.2s infinite ease-in-out}
+.ld i:nth-child(1){background:#4285f4}.ld i:nth-child(2){background:#ea4335;animation-delay:.15s}.ld i:nth-child(3){background:#fbbc05;animation-delay:.3s}.ld i:nth-child(4){background:#34a853;animation-delay:.45s}
+@keyframes ldb{0%,80%,100%{transform:scale(.55);opacity:.5}40%{transform:scale(1.15);opacity:1}}
+.ld p{margin:0;color:#5f6368;font-size:14px}.ld small{color:#80868b;opacity:0;animation:fade .4s 12s forwards;font-size:12px}
+.gview{position:absolute;inset:0}.gview iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
+.sug{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:min(560px,92%);z-index:6;background:var(--m-bg);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-radius:12px;box-shadow:var(--m-sh);padding:6px;margin:0;list-style:none}
+.sug:empty{display:none}.sug li{border:0;border-radius:8px;padding:8px 12px;cursor:default}.sug li:hover{background:var(--m-fillh)}
+.greet{font-size:15px;font-weight:600;color:var(--accent);margin-bottom:2px}.greet:empty{display:none}
+.stwin{background:#0f1418}.stwin .ptb{background:#0f1418;border:0;height:34px}.stwin .ptb>div:last-child{visibility:hidden}
+.st2{position:absolute;inset:0;display:flex;gap:12px;padding:6px 12px 12px;background:#0f1418;color:#e3e9ee;font:14px var(--m-font)}
+.st2 .nv{width:236px;flex:none;display:flex;flex-direction:column;gap:6px;overflow:auto}
+.st2 .sb{height:46px;border-radius:23px;background:#090c0f;display:flex;align-items:center;gap:10px;padding:0 16px;color:#9fb0bb;margin-bottom:6px}
+.st2 .sb svg,.st2 .nc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.st2 .sb input{flex:1;min-width:0;background:none;border:0;outline:0;color:#e3e9ee;font:inherit}
+.st2 .nc{display:flex;align-items:center;gap:14px;height:62px;padding:0 14px;border-radius:20px;background:#1a2228;border:0;color:inherit;font:inherit;font-size:16px;text-align:left;cursor:default;transition:background .12s}
+.st2 .nc:hover{background:#222d35}.st2 .nc.on{background:#2f4c5c}
+.st2 .nc i{width:38px;height:38px;border-radius:50%;background:#2a3a44;display:grid;place-items:center;flex:none}.st2 .nc.on i{background:#8fd3ff;color:#0f1418}
+.st2 .ct{flex:1;min-width:0;background:#141b20;border-radius:26px;padding:20px 24px;overflow:auto}
+.st2 h2{font-size:28px;font-weight:500;margin:0 0 16px}
+.st2 .grp{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
+.st2 .rw{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;background:#1a2228;border-radius:5px;min-height:56px;font-size:16px}
+.st2 .grp .rw:first-child{border-radius:22px 22px 5px 5px}.st2 .grp .rw:last-child{border-radius:5px 5px 22px 22px}.st2 .grp .rw:only-child{border-radius:22px}
+.st2 .kc{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.st2 select,.st2 .kc input[type=text]{background:#26323a;border:0;color:#e3e9ee;border-radius:14px;padding:9px 14px;font:inherit;font-size:14px;outline:0}
+.st2 .kc input[type=text]{width:240px}
+.st2 .bt{background:#2f4c5c;color:#e3e9ee;border:0;border-radius:20px;padding:9px 18px;font:inherit;font-size:14px;cursor:default;transition:background .12s}.st2 .bt:hover{background:#3b5d70}
+.st2 .m2{color:#9fb0bb;font-size:13px}
+.st2 .wpv{height:200px;border-radius:22px;background:#0b0f12 center/cover;margin-bottom:12px}
+.st2 .wpg{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:10px}
+.st2 .wt{border:2px solid transparent;border-radius:16px;background:#1a2228;padding:5px;color:inherit;font:inherit;font-size:12px;display:flex;flex-direction:column;gap:5px;align-items:center;cursor:default}
+.st2 .wt i{display:block;width:100%;height:58px;border-radius:11px;background:center/cover}.st2 .wt.sel{border-color:#8fd3ff}.st2 .wt:hover{background:#222d35}
+.st2 .wa{display:flex;gap:10px;margin:12px 0 18px}.st2 .rb{width:40px;height:40px;border-radius:50%;border:0;background:#2f4c5c;color:#e3e9ee;font-size:22px;line-height:1;cursor:default}.st2 .rb:hover{background:#3b5d70}
+.st2 .ac{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;padding:16px 20px;background:#1a2228;border-radius:22px}
+.st2 .ac button{width:32px;height:32px;border-radius:50%;border:2px solid transparent;cursor:default;padding:0}.st2 .ac button.sel{border-color:#fff}
+.st2 .ac label{width:32px;height:32px;border-radius:50%;background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red);display:grid;place-items:center;cursor:default;position:relative}
+.st2 .ac label input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:default}
+.st2 .rd{width:22px;height:22px;border-radius:50%;border:2px solid #7e909b;display:grid;place-items:center}.st2 .rd.on{border-color:#8fd3ff}.st2 .rd.on::after{content:"";width:10px;height:10px;border-radius:50%;background:#8fd3ff}
+.tour{position:fixed;inset:0;z-index:99990}
+.tspot{position:fixed;border-radius:16px;box-shadow:0 0 0 9999px rgba(0,0,0,.66);transition:all .25s ease;pointer-events:none}
+.tcard{position:fixed;width:310px;padding:20px;border-radius:24px;background:#1e272d;color:#e3e9ee;font:14px var(--m-font);box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.tcard h3{margin:0 0 6px;font-size:19px;font-weight:600}.tcard p{margin:0 0 16px;line-height:1.5;color:#b8c6cf}
+.tcard .ta{display:flex;justify-content:space-between;align-items:center;gap:8px}.tcard .td{color:#7e909b;font-size:12px}
+.tcard button{background:#2f4c5c;color:#e3e9ee;border:0;border-radius:18px;padding:9px 16px;font:inherit;cursor:default}.tcard button.pr{background:#8fd3ff;color:#0f1418}`;
+  document.head.append(st);
+  store.set("onboarded", true);   // the old Browser welcome bar is replaced by the tour below
+
+  /* ---- shared: a proxied page with the loading screen (used by Chat and the proxied game sites) */
+  window.nvProxyView = url => {
+    const v = el("div", "gview"), f = el("iframe"), ld = el("div", "ld");
+    ld.innerHTML = '<div class="dots"><i></i><i></i><i></i><i></i></div><p>Loading\u2026</p><small>Taking a while? Try another server in Settings, Servers.</small>';
+    f.allow = "fullscreen; autoplay; gamepad; clipboard-write"; v.append(f, ld);
+    if (window.ENGINE && ENGINE.go) { f.onload = () => { ld.hidden = true; }; ENGINE.go(f, url).catch(e => { ld.textContent = "The proxy could not start: " + (e && e.message || e); }); }
+    else ld.textContent = "The proxy isn't connected yet. Check Settings, Servers.";
+    return v;
+  };
+  let chatWin = null;
+  window.openChat = () => {
+    if (!chatWin) { const r = el("div"); r.style.cssText = "position:absolute;inset:0"; r.append(nvProxyView("https://vtx.xyz/")); chatWin = mkWin("Chat", 480, 640, r, true); }
+    chatWin.hidden = false; chatWin.style.zIndex = ++pz;
+  };
+  Object.defineProperty(window, "chatWin", { get: () => chatWin });
+
+  /* ---- greeting on Home */
+  const greet = () => {
+    const h = new Date().getHours(), n = (settings.name || "").trim(); let t = "";
+    if (h >= 5 && h < 12) t = "Good morning"; else if (h >= 12 && h < 17) t = "Good afternoon"; else if (h >= 17 && h < 22) t = "Good evening";
+    else t = n ? "Back at it" : ["Burning the midnight oil", "Still going strong", "Night owl mode"][new Date().getDate() % 3];
+    const g = document.getElementById("greet"); if (g) g.textContent = n && t ? t + ", " + n : (h >= 22 || h < 5 ? t : "");
+  };
+  window.greet = greet; greet(); setInterval(greet, 30000);
+
+  /* ---- wallpapers kept on this device */
+  const idbGet = k => idb().then(db => new Promise(ok => { const g = db.transaction("kv").objectStore("kv").get(k); g.onsuccess = () => ok(g.result || null); g.onerror = () => ok(null); })).catch(() => null);
+  const idbPut = (k, v) => idb().then(db => { db.transaction("kv", "readwrite").objectStore("kv").put(v, k); }).catch(() => {});
+  const idbDel = k => idb().then(db => { db.transaction("kv", "readwrite").objectStore("kv").delete(k); }).catch(() => {});
+  if (look.wall !== "image" || !settings.wpActive) {} else idbGet("wp:" + settings.wpActive).then(b => { if (b) useWall(b, "show"); });
+
+  /* ---- servers */
+  const SERVERS = [["Main server", "wss://nex-velo.nexero.workers.dev/wisp/"], ["Backup server (HolyWisp)", "wss://holywisp.fracit.al/"]];
+  const ping = u => new Promise(ok => { const t = performance.now(); let ws, done = false; const fin = r => { if (done) return; done = true; try { ws.close(); } catch (e) {} ok(r); };
+    try { ws = new WebSocket(u); ws.onopen = () => fin(Math.round(performance.now() - t)); ws.onerror = () => fin(null); setTimeout(() => fin(null), 6000); } catch (e) { ok(null); } });
+
+  /* ---- settings window */
+  const ICO = { General: '<path d="M4 6h16M4 12h16M4 18h10"/>', Appearance: '<circle cx="12" cy="12" r="9"/><circle cx="8.5" cy="10" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="15.5" cy="10" r="1"/>',
+    Servers: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/><path d="M7 7h.01M7 17h.01"/>', Accounts: '<circle cx="12" cy="9" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>', About: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/>' };
+  const CATS = Object.keys(ICO); let swin = null, cat = "General", query = "";
+  const row = (label, ...c) => { const r = el("div", "rw"), k = el("div", "kc"); k.append(...c); r.append(el("span", null, label), k); return r; };
+  const sw = (g, f) => { const c = el("input"); c.type = "checkbox"; c.checked = !!g(); c.onchange = () => f(c.checked); return c; };
+  const sel = (o, g, f) => { const e = el("select"); o.forEach(x => e.append(new Option(x[1], x[0]))); e.value = g(); e.onchange = () => f(e.value); return e; };
+  const bt = (t, f) => { const b = el("button", "bt", t); b.onclick = f; return b; };
+  const R = (label, ...c) => ({ label, node: row(label, ...c) });
+
+  function wallBlock() {
+    const box = el("div"), pv = el("div", "wpv"), g = el("div", "wpg"), a = el("div", "wa"), add = el("button", "rb", "+"), rem = el("button", "rb", "\u2212"), f = el("input");
+    add.title = "Add your own wallpaper"; rem.title = "Remove the selected wallpaper"; f.type = "file"; f.accept = "image/*"; f.hidden = true; a.append(add, rem, f); box.append(pv, g, a);
+    add.onclick = () => f.click();
+    f.onchange = async e => { const x = e.target.files[0]; if (!x) return; const id = String(Date.now()); await idbPut("wp:" + id, x); settings.wps = (settings.wps || []).concat([id]); settings.wpActive = id; save(); useWall(x, true); e.target.value = ""; setTimeout(draw, 400); };
+    rem.onclick = async () => { const id = settings.wpActive; if (look.wall !== "image" || !id) return; await idbDel("wp:" + id); settings.wps = (settings.wps || []).filter(x => x !== id); settings.wpActive = ""; save(); customImg = null; customUrl = ""; applyLook({ wall: "default" }); draw(); };
+    async function draw() {
+      g.replaceChildren(); let cur = "";
+      WALLS.forEach(w => { const t = el("button", "wt" + (look.wall === w[0] ? " sel" : "")), i = el("i"); i.style.background = w[2]; t.append(i, w[0] === "default" ? "None" : w[1]); if (look.wall === w[0]) cur = w[2]; t.onclick = () => { applyLook({ wall: w[0] }); }; g.append(t); });
+      for (const id of settings.wps || []) { const b = await idbGet("wp:" + id); if (!b) continue; const u = URL.createObjectURL(b), on = look.wall === "image" && settings.wpActive === id, t = el("button", "wt" + (on ? " sel" : "")), i = el("i"); i.style.backgroundImage = "url(" + u + ")"; t.append(i, "Yours"); if (on) cur = "url(" + u + ")";
+        t.onclick = () => { settings.wpActive = id; save(); useWall(b, true); }; g.append(t); }
+      pv.style.background = cur ? cur + " center/cover" : "#0b0f12";
+    }
+    draw(); return box;
+  }
+  function accentBlock() {
+    const box = el("div", "ac"), cols = ["#0a84ff", "#5ac8fa", "#40c8e0", "#63e6be", "#30d158", "#a4d433", "#ffd60a", "#ff9f0a", "#ff6b35", "#ff453a", "#ff375f", "#e040fb", "#bf5af2", "#5e5ce6", "#ac8e68", "#98989d"];
+    cols.forEach(c => { const b = el("button", settings.accent.toLowerCase() === c ? "sel" : ""); b.style.background = c; b.setAttribute("aria-label", c); b.onclick = () => { settings.accent = c; save(); applySettings(); render(); }; box.append(b); });
+    const l = el("label"), i = el("input"); i.type = "color"; i.value = /^#[0-9a-f]{6}$/i.test(settings.accent) ? settings.accent : "#0a84ff"; l.title = "Pick your own colour"; i.onchange = () => { settings.accent = i.value; save(); applySettings(); render(); }; l.append(i); box.append(l); return box;
+  }
+  function serversRows() {
+    const out = [], ms = {}, list = el("div", "grp");
+    const pick = u => { settings.wisp = u; save(); applySettings(); draw(); };
+    function draw() {
+      list.replaceChildren(); const all = SERVERS.concat(settings.wispCustom ? [["Your server", settings.wispCustom]] : []);
+      all.forEach(([n, u]) => { const r = row(n, el("span", "m2", ms[u] === undefined ? "" : ms[u] === null ? "Unreachable" : ms[u] + " ms"), el("span", "rd" + (settings.wisp === u ? " on" : ""))); r.onclick = () => pick(u); list.append(r); });
+    }
+    draw();
+    const test = async () => { const all = SERVERS.concat(settings.wispCustom ? [["Your server", settings.wispCustom]] : []); await Promise.all(all.map(async ([n, u]) => { ms[u] = await ping(u); })); draw(); return all; };
+    const inp = el("input"); inp.type = "text"; inp.placeholder = "wss://your-server/wisp/"; inp.value = settings.wispCustom || "";
+    out.push({ label: "Servers", node: list, block: true });
+    out.push(R("Test all servers", bt("Test", test)));
+    out.push(R("Use the fastest", bt("Test and switch", async () => { const all = await test(); let best = null; all.forEach(([n, u]) => { if (ms[u] !== null && (best === null || ms[u] < ms[best])) best = u; }); if (best) { pick(best); notify("Using the fastest server"); } else notify("No server answered"); })));
+    out.push(R("Your own server", inp, bt("Save", () => { const v = inp.value.trim(); if (!/^wss?:\/\//i.test(v)) { notify("Enter a ws:// or wss:// address"); return; } settings.wispCustom = v; settings.wisp = v; save(); applySettings(); draw(); })));
+    return out;
+  }
+  const dump = () => { const d = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith("winnotch.")) d[k] = localStorage.getItem(k); } return d; };
+  const wipe = () => { Object.keys(dump()).forEach(k => localStorage.removeItem(k)); };
+  function rows() {
+    const name = el("input"); name.type = "text"; name.placeholder = "Your name"; name.value = settings.name || ""; name.onchange = () => { settings.name = name.value.trim(); save(); greet(); };
+    const imp = el("input"); imp.type = "file"; imp.accept = ".json"; imp.hidden = true;
+    imp.onchange = e => { const f = e.target.files[0]; if (!f) return; f.text().then(t => { const d = JSON.parse(t); Object.keys(d).forEach(k => { if (k.startsWith("winnotch.")) localStorage.setItem(k, d[k]); }); location.reload(); }).catch(() => notify("That file couldn't be read")); };
+    return {
+      General: [R("24-hour time", sw(() => settings.h24, v => { settings.h24 = v; save(); applySettings(); })), R("Show battery", sw(() => settings.battery, v => { settings.battery = v; save(); applySettings(); })),
+        R("Open on hover", sw(() => settings.hover, v => { settings.hover = v; save(); applySettings(); })),
+        R("Closed notch shows", sel([["time", "Time"], ["date", "Time and date"], ["battery", "Time and battery"], ["weather", "Time and weather"], ["task", "Next task"]], () => settings.closed, v => { settings.closed = v; save(); applySettings(); })),
+        R("Search engine", sel([["ddg", "DuckDuckGo"], ["google", "Google"], ["bing", "Bing"], ["brave", "Brave"]], () => settings.engine || "ddg", v => { settings.engine = v; save(); })),
+        R("Weather location", bt("Detect my location", () => document.getElementById("detectLoc").click()))],
+      Appearance: [{ label: "Wallpaper", node: wallBlock(), block: true }, { label: "Accent colour", node: accentBlock(), block: true },
+        R("React to mouse", sw(() => look.react, v => applyLook({ react: v }))), R("Christmas theme", bt("Apply", () => applyLook({ wall: "blue", snow: true, amount: 240, windSpeed: 18, heading: 80, settle: true, lights: true, palette: "classic", react: true }, "#ff453a"))),
+        R("Falling snow", sw(() => look.snow, v => applyLook({ snow: v }))), R("Hanging lights", sw(() => look.lights, v => applyLook({ lights: v }))), R("Clear snow", bt("Clear", () => { clearSnow(); schedule(); })),
+        R("Auto-hide dock", sw(() => !!settings.dockHide, v => { settings.dockHide = v; save(); if (window.applyDock) applyDock(); })), R("Reset appearance", bt("Reset", () => applyLook(Object.assign({}, LOOK_DEFAULT), "#0a84ff")))],
+      Servers: serversRows(),
+      Accounts: [R("Display name", name), R("Export data", bt("Export", () => { const a = el("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(dump())], { type: "application/json" })); a.download = "nex-velo-backup.json"; a.click(); })),
+        R("Import data", bt("Import", () => imp.click()), imp),
+        R("Reset everything", bt("Reset", () => { if (confirm("Reset all settings to their defaults? Your notes and other data stay.")) { localStorage.removeItem("winnotch.settings"); location.reload(); } })),
+        R("Delete all data", bt("Delete", () => { if (confirm("Delete ALL your data on this device? This cannot be undone.")) { wipe(); indexedDB.deleteDatabase("winnotch"); location.reload(); } }))],
+      About: [R("Nex.Velo", el("span", "m2", "Version " + VER)), R("Replay the tour", bt("Start", () => { if (swin) swin.hidden = true; tour(true); }))] };
+  }
+  function build() {
+    const root = el("div", "st2"), nav = el("div", "nv"), ct = el("div", "ct"), sb = el("label", "sb"), si = el("input");
+    sb.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'; si.placeholder = "Search settings"; sb.append(si); nav.append(sb);
+    CATS.forEach(c => { const b = el("button", "nc"); b.innerHTML = '<i><svg viewBox="0 0 24 24">' + ICO[c] + '</svg></i>'; b.append(el("span", null, c)); b.onclick = () => { cat = c; query = ""; si.value = ""; render(); }; nav.append(b); });
+    si.oninput = () => { query = si.value.trim().toLowerCase(); render(); }; root.append(nav, ct); return root;
+  }
+  function render() {
+    if (!swin) return; const root = swin.querySelector(".st2"), ct = root.querySelector(".ct"), data = rows();
+    root.querySelectorAll(".nc").forEach(b => b.classList.toggle("on", !query && b.textContent === cat)); ct.replaceChildren();
+    const fill = list => { let g = null; list.forEach(r => { if (r.block) { g = null; ct.append(r.node); } else { if (!g) { g = el("div", "grp"); ct.append(g); } g.append(r.node); } }); };
+    if (query) { ct.append(el("h2", null, "Results")); const m = []; CATS.forEach(c => data[c].forEach(r => { if (!r.block && r.label.toLowerCase().includes(query)) m.push(r); })); if (m.length) fill(m); else ct.append(el("div", "m2", "No settings match.")); return; }
+    ct.append(el("h2", null, cat)); fill(data[cat]);
+  }
+  openSettingsWin = function () { if (!swin) { swin = mkWin("Settings", 920, 620, build(), true); swin.classList.add("stwin"); } swin.hidden = false; swin.style.zIndex = ++pz; render(); };
+  window.refreshSet = () => { if (swin && !swin.hidden) setTimeout(render, 0); };
+
+  /* ---- the tour (shown on the first visit, replay it from Settings, About) */
+  function tour(replay) {
+    const steps = [["Welcome to Nex.Velo", "Here is a quick look around. It only takes a moment.", null],
+      ["The notch", "Hover the notch at the top. Home, Control, Clipboard, To-do, Clock, Shelf and Settings live inside it.", "#pill"],
+      ["The dock", "Your apps sit in the dock at the bottom: Browser, Music, Games and Chat.", ".dock"],
+      ["Browser", "Browse the web through the proxy. If a page won't load, pick another server in Settings, Servers.", '.dk[aria-label="Browser"]'],
+      ["Apps", "The nine-dot button holds extra tools such as Notes, Currency and World Clock.", '.dk[aria-label="Apps"]'],
+      ["Settings", "Open the notch and press the gear to change your wallpaper, colours, servers and name.", "#gearBtn"]];
+    let i = 0; const root = el("div", "tour"), spot = el("div", "tspot"), card = el("div", "tcard"); root.append(spot, card); document.body.append(root); const pillEl = document.getElementById("pill");
+    const done = () => { pillEl.classList.remove("open"); root.remove(); store.set("toured", true); };
+    function show() {
+      const [t, p, sl] = steps[i]; if (sl === "#gearBtn") pillEl.classList.add("open"); else pillEl.classList.remove("open");
+      const tg = sl && document.querySelector(sl), r = tg && tg.getBoundingClientRect(); card.replaceChildren(); card.append(el("h3", null, t), el("p", null, p));
+      const a = el("div", "ta"), left = el("span", "td", (i + 1) + " / " + steps.length), btns = el("div"); btns.style.cssText = "display:flex;gap:8px";
+      if (i > 0) { const b = el("button", null, "Back"); b.onclick = () => { i--; show(); }; btns.append(b); }
+      if (replay && i < steps.length - 1) { const b = el("button", null, "Skip"); b.onclick = done; btns.append(b); }
+      const n = el("button", "pr", i < steps.length - 1 ? "Next" : "Done"); n.onclick = () => { if (i < steps.length - 1) { i++; show(); } else done(); }; btns.append(n); a.append(left, btns); card.append(a);
+      if (r && r.width) { spot.style.cssText = "left:" + (r.left - 8) + "px;top:" + (r.top - 8) + "px;width:" + (r.width + 16) + "px;height:" + (r.height + 16) + "px"; }
+      else { spot.style.cssText = "left:50%;top:50%;width:0;height:0"; }
+      setTimeout(() => { const rr = tg && tg.getBoundingClientRect(), h = card.offsetHeight; let x = innerWidth / 2 - 155, y = innerHeight / 2 - h / 2;
+        if (rr && rr.width) { x = Math.max(12, Math.min(innerWidth - 322, rr.left + rr.width / 2 - 155)); y = rr.top > innerHeight / 2 ? Math.max(12, rr.top - h - 24) : rr.bottom + 24; }
+        card.style.left = x + "px"; card.style.top = y + "px"; }, 60);
+    }
+    show();
+  }
+  window.nvTour = tour;
+  if (!store.get("toured", false)) setTimeout(() => tour(false), 800);
+})();
+</script>
 <!-- music-ui:start -->
 <script>
 /* ===== Music sources =====
@@ -2037,9 +2291,24 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
   const scope = css => css.replace(/([^{}]+)\{([^{}]*)\}/g, (m, s, b) => s.split(",").map(x => ".mu " + x.trim()).join(",") + "{" + b + "}");
   const st = el("style");
   st.textContent = scope(CSS) + `
-.mu{position:absolute;inset:0;container:mu/inline-size;--pn:#121212;--p2:#1f1f1f;--p3:#2c2c2c;--p4:#3a3a3a;--mut:#b3b3b3;--ac:#ff2d7a}
+.mu{position:absolute;inset:0;container:mu/inline-size;--pn:#161d22;--p2:#1e272d;--p3:#27323a;--p4:#33424c;--mut:#a9b8c2;--ac:#8fd3ff}
+.mu .app{background:#0f1418;gap:12px;padding:0 12px;grid-template-rows:64px minmax(0,1fr) 84px}
+.mu .lib{grid-column:1;grid-row:1/3;padding:0;display:flex;flex-direction:column;gap:12px;overflow:hidden;background:none}
+.mu .navc{padding:10px;flex:none}.mu .libc{flex:1;padding:14px 12px;overflow:auto}
+.mu .top{grid-column:2/-1;grid-row:1;grid-template-columns:auto minmax(0,640px) 1fr;gap:12px}.mu .main{grid-column:2;grid-row:2}.mu .np{grid-column:3;grid-row:2}.mu .bar{grid-column:1/-1;grid-row:3}
+.mu .pn{border-radius:28px}.mu .logo,.mu .bell,.mu .me,.mu .hm,.mu .fw,.mu .tr{display:none}
+.mu .bk{width:44px;height:44px;border-radius:50%;background:var(--p2);display:grid;place-items:center;font-size:18px;color:var(--mut)}.mu .nav{color:inherit}
+.mu .search{height:48px;border-radius:24px;background:var(--pn);border:1px solid var(--p4)}
+.mu .nvb{display:flex;align-items:center;gap:16px;width:100%;height:52px;padding:0 16px;border-radius:26px;font-size:17px;color:var(--mut);text-align:left;transition:background .12s}
+.mu .nvb:hover{background:var(--p2);color:#fff}.mu .nvb.on{background:#2b4a5a;color:#fff}.mu .nvb span{font-size:20px;display:grid}
+.mu .cpi.on{background:#2b4a5a;color:#fff}.mu .qt{border-radius:14px;background:var(--p2)}.mu .qt .art{border-radius:0}
+.mu .hgr{font-size:42px;font-weight:500;letter-spacing:-.01em;margin:6px 0 10px}
+.mu .dlg{position:absolute;inset:0;z-index:8;background:rgba(0,0,0,.55);display:grid;place-items:center}
+.mu .dbox{width:min(440px,90%);background:#1e272d;border-radius:30px;padding:26px 28px 20px;text-align:center}.mu .dbox svg{font-size:22px;color:#cfe8f5}.mu .dbox h3{font-size:24px;font-weight:500;margin:10px 0 18px}
+.mu .dbox input{width:100%;height:56px;border-radius:14px;border:2px solid var(--ac);background:#161d22;color:#fff;padding:0 16px;font-size:20px;outline:0}
+.mu .da{display:flex;justify-content:flex-end;gap:10px;margin-top:22px}.mu .da button{color:var(--ac);padding:10px 16px;border-radius:20px;font-size:17px}.mu .da button:hover{background:#27323a}
 @container mu (max-width:920px){.mu .app{grid-template-columns:240px minmax(0,1fr)}.mu .np{display:none}}
-@container mu (max-width:620px){.mu .app{grid-template-columns:minmax(0,1fr)}.mu .lib,.mu .rt{display:none}.mu .bar{grid-template-columns:1fr 1.3fr}}
+@container mu (max-width:620px){.mu .app{grid-template-columns:minmax(0,1fr)}.mu .lib,.mu .rt{display:none}.mu .bar{grid-template-columns:1fr 1.3fr}.mu .top,.mu .main{grid-column:1/-1}}
 .muwin{background:#000;min-width:520px;min-height:360px}.muwin .ptb{height:34px;background:#000;border-bottom:0}.muwin .ptb>div:last-child{visibility:hidden}.muwin .pbody{background:#000}
 .dk.mrun::after{content:"";position:absolute;bottom:-7px;width:4px;height:4px;border-radius:50%;background:var(--m-fg);opacity:.7}`;
   document.head.append(st);
@@ -2070,9 +2339,9 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
   function build() {
     const root = el("div", "mu");
     root.innerHTML = '<div class="app"><header class="top"><div class="tl"><div class="logo" data-i="note" data-f="1"></div><div class="nav"><button class="bk" data-i="back" aria-label="Back"></button><button class="fw" data-i="fwd" aria-label="Forward"></button></div></div>' +
-      '<div class="mid"><button class="round hm" data-i="home" aria-label="Home"></button><label class="search"><span data-i="search"></span><input class="qs" type="text" placeholder="Search, or paste a YouTube or SoundCloud link" autocomplete="off" spellcheck="false"></label></div>' +
+      '<div class="mid"><button class="round hm" data-i="home" aria-label="Home"></button><label class="search"><span data-i="search"></span><input class="qs" type="text" placeholder="What do you want to play?" title="Search, or paste a YouTube or SoundCloud link" autocomplete="off" spellcheck="false"></label></div>' +
       '<div class="tr"><span class="bell" data-i="bell"></span><button class="round me" data-i="user" aria-label="Profile"></button></div></header>' +
-      '<aside class="pn lib"><div class="lh"><b>Your Library</b><button class="ib plus" data-i="plus" aria-label="Create"></button></div><div class="cp"></div><div class="lst"></div></aside>' +
+      '<aside class="lib"><div class="pn navc"><button class="nvb on" data-n="home"><span data-i="home"></span>Home</button><button class="nvb" data-n="search"><span data-i="search"></span>Search</button><button class="nvb" data-n="lib"><span data-i="list"></span>Your library</button><button class="nvb" data-n="queue"><span data-i="q"></span>Queue</button></div><div class="pn libc"><div class="lh"><b>Your library</b><button class="ib plus" data-i="plus" aria-label="New playlist"></button></div><div class="cp"></div><div class="lst"></div></div></aside>' +
       '<main class="pn main"></main><aside class="pn np"></aside>' +
       '<footer class="bar"><div class="nowp"><div class="art barart"></div><div><b class="bt"></b><small class="ba"></small></div></div>' +
       '<div class="ctl"><div class="btns"><button class="shuf" data-i="shuf" aria-label="Shuffle"></button><button class="prev" data-i="prev" data-f="1" aria-label="Previous"></button><button class="pp" aria-label="Play"></button><button class="next" data-i="next" data-f="1" aria-label="Next"></button><button class="rep" data-i="rep" aria-label="Repeat"></button></div>' +
@@ -2093,10 +2362,16 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
     }
     addEventListener("pointerdown", e => { if (!e.target.closest(".mn")) closeMenu(); }, true);
 
+    function dialog(title, val, ok) {
+      const d = el("div", "dlg"), b = el("div", "dbox"), i = el("input"), a = el("div", "da"), no = el("button", null, "Cancel"), yes = el("button", null, "Create"), ico = el("span");
+      ico.innerHTML = ic("q"); i.value = val; a.append(no, yes); b.append(ico, el("h3", null, title), i, a); d.append(b); root.append(d); setTimeout(() => { i.focus(); i.select(); }, 30);
+      const close = () => d.remove(), fin = () => { const v = i.value.trim(); close(); ok(v); };
+      no.onclick = close; yes.onclick = fin; d.onpointerdown = e => { if (e.target === d) close(); }; i.onkeydown = e => { if (e.key === "Enter") fin(); else if (e.key === "Escape") close(); };
+    }
     /* Library actions */
     const toggleLike = t => { D.liked = isL(t) ? D.liked.filter(x => !same(x, t)) : [t].concat(D.liked); save(); drawLib(); paint(); if (H[hi].v === "liked") render(); };
     const addTo = (p, t) => { if (p.tracks.some(x => same(x, t))) return toast("Already in " + p.name); p.tracks.push(t); save(); toast("Added to " + p.name); drawLib(); };
-    const newPl = t => { const p = { id: "p" + Date.now(), name: "My playlist " + (D.pl.length + 1), tracks: t ? [t] : [] }; D.pl.push(p); save(); drawLib(); go({ v: "pl", id: p.id, focus: 1 }); };
+    const newPl = t => dialog("New playlist", "My playlist #" + (D.pl.length + 1), name => { const p = { id: "p" + Date.now(), name: name || "My playlist #" + (D.pl.length + 1), tracks: t ? [t] : [] }; D.pl.push(p); save(); drawLib(); go({ v: "pl", id: p.id }); });
     function trackMenu(x, y, t, pl) {
       const it = [[isL(t) ? "Remove from Liked Songs" : "Save to Liked Songs", () => toggleLike(t)], ["Play next", () => { Q.splice(qi + 1, 0, t); toast("Playing next"); drawNp(); }], ["Add to queue", () => { Q.push(t); toast("Added to queue"); drawNp(); }], null, { h: "Add to playlist" }];
       D.pl.slice(0, 8).forEach(p => it.push([p.name, () => addTo(p, t)])); it.push(["New playlist", () => newPl(t)]);
@@ -2220,6 +2495,8 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
     const go = (v, push = true) => { if (push) { H = H.slice(0, hi + 1); H.push(v); hi = H.length - 1; } render(); };
     q(".bk").onclick = () => { if (hi > 0) { hi--; render(); } }; q(".fw").onclick = () => { if (hi < H.length - 1) { hi++; render(); } };
     q(".hm").onclick = () => { q(".qs").value = ""; go({ v: "home" }); };
+    q(".nvb[data-n=home]").onclick = () => { q(".qs").value = ""; go({ v: "home" }); }; q(".nvb[data-n=search]").onclick = () => q(".qs").focus();
+    q(".nvb[data-n=lib]").onclick = () => go({ v: "liked" }); q(".nvb[data-n=queue]").onclick = () => q(".qb").click();
     q(".plus").onclick = e => { const b = e.currentTarget.getBoundingClientRect(); menu(b.left, b.bottom + 4, [["New playlist", () => newPl()], ["Add songs from this device", () => q(".ff").click()], ["YouTube search key\u2026", () => { const k = prompt("Optional: paste a YouTube Data API key to search YouTube here. Leave empty to remove it. Pasting a YouTube or SoundCloud link into search works without a key.", store.get("ytkey", "")); if (k !== null) { store.set("ytkey", k.trim()); toast(k.trim() ? "YouTube search is on" : "YouTube search key removed"); } }]]); };
     q(".ff").onchange = e => {
       const f = [...e.target.files]; if (!f.length) return; const add = f.map((x, i) => ({ id: "f" + Date.now() + i, t: x.name.replace(/\.[^.]+$/, ""), a: "This device", d: 0, url: URL.createObjectURL(x) }));
@@ -2264,7 +2541,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
 
     /* Views */
     function render() {
-      const v = H[hi], my = ++tok; M.replaceChildren(); M.scrollTop = 0; q(".bk").style.opacity = hi > 0 ? 1 : .35; q(".fw").style.opacity = hi < H.length - 1 ? 1 : .35;
+      const v = H[hi], my = ++tok; M.replaceChildren(); M.scrollTop = 0; root.querySelectorAll(".nvb").forEach(b => b.classList.toggle("on", b.dataset.n === (v.v === "home" ? "home" : v.v === "search" ? "search" : "lib"))); q(".bk").style.opacity = hi > 0 ? 1 : .35; q(".fw").style.opacity = hi < H.length - 1 ? 1 : .35;
       if (v.v === "liked") { header("Playlist", "Liked Songs", D.liked); M.append(D.liked.length ? rows(D.liked) : el("p", "nh", "Press the heart on any song to save it here.")); }
       else if (v.v === "pl") { const p = D.pl.find(x => x.id === v.id); if (!p) return go({ v: "home" }, false); header("Playlist", p.name, p.tracks, p); M.append(p.tracks.length ? rows(p.tracks, p) : el("p", "nh", "This playlist is empty. Search for songs and use the three dots to add them.")); }
       else if (v.v === "search") {
@@ -2274,7 +2551,7 @@ input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(
         else out.append(loc.concat(smp).length ? rows(loc.concat(smp)) : none);
       }
       else {
-        const tiles = el("div", "qg"), mk = (a, name, fn) => { const b = el("button", "qt"); b.append(a, el("span", null, name)); b.onclick = fn; tiles.append(b); };
+        M.append(el("h1", "hgr", (() => { const h = new Date().getHours(), p = h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening", n = (settings.name || "").trim(); return n ? p + ", " + n : p; })())); const tiles = el("div", "qg"), mk = (a, name, fn) => { const b = el("button", "qt"); b.append(a, el("span", null, name)); b.onclick = fn; tiles.append(b); };
         mk(heartArt(), "Liked Songs", () => go({ v: "liked" })); D.pl.slice(0, 7).forEach(p => mk(artEl(p.tracks[0] || { id: p.id }), p.name, () => go({ v: "pl", id: p.id }))); M.append(tiles);
         const strip = (title, list) => { M.append(sec(title)); const r = el("div", "rw"); list.forEach((t, i) => r.append(card(t, list, i))); M.append(r); };
         if (LOCAL.length) strip("On this device", LOCAL);
