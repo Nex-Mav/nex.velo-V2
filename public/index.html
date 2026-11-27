@@ -1936,6 +1936,7 @@
   const st = el("style");
   st.textContent = `
 .pwin [data-s],.pwin .urlw .wdot,.pempty .es,.pbody .sheet:not(.asheet),.prog{display:none!important}
+.pbody{overflow:hidden}
 .ld{position:absolute;inset:0;z-index:3;background:#fff;display:grid;align-content:center;justify-items:center;gap:16px;font-family:var(--m-font)}
 .ld[hidden]{display:none}.ld .dots{display:flex;gap:10px}
 .ld i{width:14px;height:14px;border-radius:50%;animation:ldb 1.2s infinite ease-in-out}
@@ -1946,8 +1947,9 @@
 .sug{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:min(560px,92%);z-index:6;background:var(--m-bg);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-radius:12px;box-shadow:var(--m-sh);padding:6px;margin:0;list-style:none}
 .sug:empty{display:none}.sug li{border:0;border-radius:8px;padding:8px 12px;cursor:default}.sug li:hover{background:var(--m-fillh)}
 .greet{font-size:15px;font-weight:600;color:var(--accent);margin-bottom:2px}.greet:empty{display:none}
-.stwin{background:#0f1418}.stwin .ptb{background:#0f1418;border:0;height:34px}.stwin .ptb>div:last-child{visibility:hidden}
-.st2{position:absolute;inset:0;display:flex;gap:12px;padding:6px 12px 12px;background:#0f1418;color:#e3e9ee;font:14px var(--m-font)}
+.stwin{background:#0f1418;border-radius:26px}.stwin .ptb{position:absolute;top:0;left:0;right:0;height:20px;padding:0;background:transparent;border:0;z-index:3}.stwin .ptb>*{display:none}
+.st2{position:absolute;inset:0;display:flex;gap:12px;padding:14px 12px 12px;background:#0f1418;color:#e3e9ee;font:14px var(--m-font)}
+.st2 .sx{position:absolute;top:12px;right:16px;width:34px;height:34px;border-radius:50%;border:0;background:#26323a;color:#e3e9ee;font-size:20px;line-height:1;cursor:default;z-index:4}.st2 .sx:hover{background:#33424c}
 .st2 .nv{width:236px;flex:none;display:flex;flex-direction:column;gap:6px;overflow:auto}
 .st2 .sb{height:46px;border-radius:23px;background:#090c0f;display:flex;align-items:center;gap:10px;padding:0 16px;color:#9fb0bb;margin-bottom:6px}
 .st2 .sb svg,.st2 .nc svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
@@ -1955,7 +1957,7 @@
 .st2 .nc{display:flex;align-items:center;gap:14px;height:62px;padding:0 14px;border-radius:20px;background:#1a2228;border:0;color:inherit;font:inherit;font-size:16px;text-align:left;cursor:default;transition:background .12s}
 .st2 .nc:hover{background:#222d35}.st2 .nc.on{background:#2f4c5c}
 .st2 .nc i{width:38px;height:38px;border-radius:50%;background:#2a3a44;display:grid;place-items:center;flex:none}.st2 .nc.on i{background:#8fd3ff;color:#0f1418}
-.st2 .ct{flex:1;min-width:0;background:#141b20;border-radius:26px;padding:20px 24px;overflow:auto}
+.st2 .ct{flex:1;min-width:0;background:#141b20;border-radius:26px;padding:20px 64px 20px 24px;overflow:auto}
 .st2 h2{font-size:28px;font-weight:500;margin:0 0 16px}
 .st2 .grp{display:flex;flex-direction:column;gap:2px;margin-bottom:16px}
 .st2 .rw{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 20px;background:#1a2228;border-radius:5px;min-height:56px;font-size:16px}
@@ -2104,7 +2106,7 @@
     const root = el("div", "st2"), nav = el("div", "nv"), ct = el("div", "ct"), sb = el("label", "sb"), si = el("input");
     sb.innerHTML = '<svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'; si.placeholder = "Search settings"; sb.append(si); nav.append(sb);
     CATS.forEach(c => { const b = el("button", "nc"); b.innerHTML = '<i><svg viewBox="0 0 24 24">' + ICO[c] + '</svg></i>'; b.append(el("span", null, c)); b.onclick = () => { cat = c; query = ""; si.value = ""; render(); }; nav.append(b); });
-    si.oninput = () => { query = si.value.trim().toLowerCase(); render(); }; root.append(nav, ct); return root;
+    si.oninput = () => { query = si.value.trim().toLowerCase(); render(); }; const x = el("button", "sx", "\u00d7"); x.setAttribute("aria-label", "Close"); x.onclick = () => { swin.hidden = true; }; root.append(nav, ct, x); return root;
   }
   function render() {
     if (!swin) return; const root = swin.querySelector(".st2"), ct = root.querySelector(".ct"), data = rows();
