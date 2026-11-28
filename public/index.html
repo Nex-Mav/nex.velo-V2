@@ -412,7 +412,7 @@
     get(k, d) { try { const v = localStorage.getItem("winnotch." + k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
     set(k, v) { try { localStorage.setItem("winnotch." + k, JSON.stringify(v)); } catch (e) {} }
   };
-  const WISP_DEFAULT = "wss://nex-velo.nexero.workers.dev/wisp/";
+  const WISP_DEFAULT = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/wisp/";
   let settings = Object.assign({ h24: true, battery: true, hover: true, accent: "#0a84ff", closed: "time", lat: null, lon: null, wisp: WISP_DEFAULT, vol: 80 }, store.get("settings", {}));
   let todos = store.get("todos", []);
   let clips = store.get("clips", []);
@@ -564,7 +564,7 @@
       '<button class="tbtn" data-r title="Reload"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 11-2.3-5.7M20 4v5h-5"/></svg></button>' +
       '</div>' +
       '<div class="prog"></div><div class="pbody"><div class="pempty"><div class="fav-wrap"><div class="fav-h">Favorites</div><div class="fgrid"></div></div>' +
-      '<p class="es"><span class="wdot"></span><span class="wl">Checking Wisp\u2026</span></p></div><iframe hidden></iframe><div class="ld" hidden><div class="dots"><i></i><i></i><i></i><i></i></div><p>Loading\u2026</p><small>Taking a while? Try another server in Settings, Servers.</small></div><div class="drop">Drop a link to open it</div><div class="sheet"></div></div>';
+      '<p class="es"><span class="wdot"></span><span class="wl">Checking Wisp\u2026</span></p></div><iframe hidden></iframe><div class="ld" hidden></div><div class="drop">Drop a link to open it</div><div class="sheet"></div></div>';
     document.body.appendChild(pwin);
     const q = s => pwin.querySelector(s), input = q("input"), frame = q("iframe"), prog = q(".prog"), ld = q(".ld"), empty = q(".pempty"), tb = q(".ptb"), sheet = q(".sheet"), fav = q(".fav");
     const grid = q(".fgrid"), asheet = document.createElement("div");
@@ -601,8 +601,13 @@
     const go = v => {
       const u = normalizeUrl(v); if (!u) return; cur = u; input.value = u; empty.hidden = true; frame.hidden = false; ld.hidden = false;
       prog.style.transition = "none"; prog.style.width = "0"; prog.classList.add("on"); void prog.offsetWidth; prog.style.transition = ""; prog.style.width = "80%";
-      frame.onload = () => { ld.hidden = true; prog.style.width = "100%"; setTimeout(() => { prog.classList.remove("on"); prog.style.width = "0"; }, 350); };
-      if (ENGINE.go) { frame.removeAttribute("srcdoc"); ENGINE.go(frame, u).catch(err => { ld.hidden = true; frame.srcdoc = notice("The proxy could not start: " + (err && err.message || err)); }); }
+      frame.onload = () => { if (ld._L) ld._L.done(); clearTimeout(ld._T); ld.hidden = true; prog.style.width = "100%"; setTimeout(() => { prog.classList.remove("on"); prog.style.width = "0"; }, 350); };
+      if (ENGINE.go) {
+        frame.removeAttribute("srcdoc");
+        const L = ld._L = nvLd(ld, () => Promise.resolve(ENGINE.reset && ENGINE.reset()).then(() => go(u)));
+        clearTimeout(ld._T); ld._T = setTimeout(() => { if (!ld.hidden) L.fail("The page took too long to load."); }, 45000);
+        ENGINE.go(frame, u, L.step).catch(err => L.fail((err && err.message) || String(err)));
+      }
       else if (ENGINE.encode) { frame.removeAttribute("srcdoc"); frame.src = ENGINE.encode(u); }
       else frame.srcdoc = notice("The browser window is ready and pointed at <code>" + getWisp() + "</code>. Register your proxy\u2019s service worker and set <code>ENGINE.encode</code> in this file to start loading pages.");
     };
@@ -1942,7 +1947,11 @@
 .ld i{width:14px;height:14px;border-radius:50%;animation:ldb 1.2s infinite ease-in-out}
 .ld i:nth-child(1){background:#4285f4}.ld i:nth-child(2){background:#ea4335;animation-delay:.15s}.ld i:nth-child(3){background:#fbbc05;animation-delay:.3s}.ld i:nth-child(4){background:#34a853;animation-delay:.45s}
 @keyframes ldb{0%,80%,100%{transform:scale(.55);opacity:.5}40%{transform:scale(1.15);opacity:1}}
-.ld p{margin:0;color:#5f6368;font-size:14px}.ld small{color:#80868b;opacity:0;animation:fade .4s 12s forwards;font-size:12px}
+.ld .lh{margin:0;color:#202124;font-size:16px;text-align:center;max-width:80%}
+.lbar{width:min(360px,70%);height:6px;border-radius:3px;background:#e8eaed;overflow:hidden}.lbar b{display:block;height:100%;width:6%;background:#4285f4;border-radius:3px;transition:width .4s ease,background .3s}
+.lsteps{width:min(360px,80%);height:112px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;font-size:13px;color:#5f6368;-webkit-mask-image:linear-gradient(transparent,#000 45%);mask-image:linear-gradient(transparent,#000 45%)}
+.ls{padding:2px 0}.ls.ok::before{content:"\\2713  ";color:#34a853}.ls.now::before{content:"\\2022  ";color:#4285f4}
+.lerr{text-align:center;color:#c5221f;max-width:80%;font-size:13px;line-height:1.5}.lerr button{display:block;margin:12px auto 0;background:#1a73e8;color:#fff;border:0;border-radius:18px;padding:9px 20px;font:inherit;cursor:pointer}
 .gview{position:absolute;inset:0}.gview iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000}
 .sug{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:min(560px,92%);z-index:6;background:var(--m-bg);backdrop-filter:blur(30px) saturate(1.8);-webkit-backdrop-filter:blur(30px) saturate(1.8);border-radius:12px;box-shadow:var(--m-sh);padding:6px;margin:0;list-style:none}
 .sug:empty{display:none}.sug li{border:0;border-radius:8px;padding:8px 12px;cursor:default}.sug li:hover{background:var(--m-fillh)}
@@ -1987,13 +1996,23 @@
   store.set("onboarded", true);   // the old Browser welcome bar is replaced by the tour below
 
   /* ---- shared: a proxied page with the loading screen (used by Chat and the proxied game sites) */
+  window.nvLd = (ld, retry) => {
+    ld.hidden = false; ld.innerHTML = '<p class="lh">Starting the proxy\u2026</p><div class="lbar"><b></b></div><div class="lsteps"></div><div class="lerr" hidden></div>';
+    const bar = ld.querySelector(".lbar b"), list = ld.querySelector(".lsteps"), head = ld.querySelector(".lh"), err = ld.querySelector(".lerr"); let n = 0, dead = false;
+    return {
+      step(t) { if (dead) return; const o = list.querySelector(".now"); if (o) o.className = "ls ok"; list.append(el("div", "ls now", t)); head.textContent = t; n++; bar.style.width = Math.min(94, 6 + n * 13) + "%"; },
+      done() { dead = true; bar.style.width = "100%"; const o = list.querySelector(".now"); if (o) o.className = "ls ok"; ld.hidden = true; },
+      fail(m) { if (dead) return; dead = true; bar.style.background = "#ea4335"; head.textContent = "The proxy stopped"; err.hidden = false; err.replaceChildren(el("div", null, m)); const b = el("button", null, "Reload proxy"); b.onclick = () => { err.hidden = true; Promise.resolve(retry && retry()); }; err.append(b); }
+    };
+  };
   window.nvProxyView = url => {
-    const v = el("div", "gview"), f = el("iframe"), ld = el("div", "ld");
-    ld.innerHTML = '<div class="dots"><i></i><i></i><i></i><i></i></div><p>Loading\u2026</p><small>Taking a while? Try another server in Settings, Servers.</small>';
-    f.allow = "fullscreen; autoplay; gamepad; clipboard-write"; v.append(f, ld);
-    if (window.ENGINE && ENGINE.go) { f.onload = () => { ld.hidden = true; }; ENGINE.go(f, url).catch(e => { ld.textContent = "The proxy could not start: " + (e && e.message || e); }); }
-    else ld.textContent = "The proxy isn't connected yet. Check Settings, Servers.";
-    return v;
+    const v = el("div", "gview"), f = el("iframe"), ld = el("div", "ld"); f.allow = "fullscreen; autoplay; gamepad; clipboard-write"; v.append(f, ld);
+    const run = () => {
+      const L = nvLd(ld, () => Promise.resolve(window.ENGINE && ENGINE.reset && ENGINE.reset()).then(run)); f.onload = () => L.done();
+      clearTimeout(ld._T); ld._T = setTimeout(() => { if (!ld.hidden) L.fail("The page took too long to load."); }, 45000);
+      if (window.ENGINE && ENGINE.go) ENGINE.go(f, url, L.step).catch(e => L.fail((e && e.message) || String(e))); else L.fail("The proxy isn't connected yet. Check Settings, Servers.");
+    };
+    run(); return v;
   };
   let chatWin = null;
   window.openChat = () => {
@@ -2018,7 +2037,7 @@
   if (look.wall !== "image" || !settings.wpActive) {} else idbGet("wp:" + settings.wpActive).then(b => { if (b) useWall(b, "show"); });
 
   /* ---- servers */
-  const SERVERS = [["Main server", "wss://nex-velo.nexero.workers.dev/wisp/"], ["Backup server (HolyWisp)", "wss://holywisp.fracit.al/"]];
+  const SERVERS = [["Main server (this site)", WISP_DEFAULT], ["Backup server (HolyWisp)", "wss://holywisp.fracit.al/"]];
   const ping = u => new Promise(ok => { const t = performance.now(); let ws, done = false; const fin = r => { if (done) return; done = true; try { ws.close(); } catch (e) {} ok(r); };
     try { ws = new WebSocket(u); ws.onopen = () => fin(Math.round(performance.now() - t)); ws.onerror = () => fin(null); setTimeout(() => fin(null), 6000); } catch (e) { ok(null); } });
 
@@ -2133,7 +2152,7 @@
       const tg = sl && document.querySelector(sl), r = tg && tg.getBoundingClientRect(); card.replaceChildren(); card.append(el("h3", null, t), el("p", null, p));
       const a = el("div", "ta"), left = el("span", "td", (i + 1) + " / " + steps.length), btns = el("div"); btns.style.cssText = "display:flex;gap:8px";
       if (i > 0) { const b = el("button", null, "Back"); b.onclick = () => { i--; show(); }; btns.append(b); }
-      if (replay && i < steps.length - 1) { const b = el("button", null, "Skip"); b.onclick = done; btns.append(b); }
+      if (i < steps.length - 1) { const b = el("button", null, "Skip tour"); b.onclick = done; btns.append(b); }
       const n = el("button", "pr", i < steps.length - 1 ? "Next" : "Done"); n.onclick = () => { if (i < steps.length - 1) { i++; show(); } else done(); }; btns.append(n); a.append(left, btns); card.append(a);
       if (r && r.width) { spot.style.cssText = "left:" + (r.left - 8) + "px;top:" + (r.top - 8) + "px;width:" + (r.width + 16) + "px;height:" + (r.height + 16) + "px"; }
       else { spot.style.cssText = "left:50%;top:50%;width:0;height:0"; }
@@ -2157,7 +2176,7 @@
      GET {api}/stream?source=soundcloud|ytmusic&id=...  ->  the audio itself (with CORS headers and Range support)
    Set it in the page with:  Music.config.api = "https://your-worker.example/music"   */
 (() => {
-  const APP = "NexVelo", cfg = { api: "" }; let host = null;
+  const APP = "NexVelo", cfg = { api: "/api/music" }; let host = null;
   const getHost = async () => host || (host = (await (await fetch("https://api.audius.co")).json()).data[0]);
   async function aud(p) { const h = await getHost(), r = await fetch(h + "/v1" + p + (p.includes("?") ? "&" : "?") + "app_name=" + APP); if (!r.ok) { host = null; throw new Error("audius"); } return (await r.json()).data; }
   const fromA = x => ({ id: "au" + x.id, src: "audius", sid: x.id, t: x.title, a: (x.user && x.user.name) || "Unknown", d: x.duration || 0, img: x.artwork && (x.artwork["480x480"] || x.artwork["150x150"]) });
